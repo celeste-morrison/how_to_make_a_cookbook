@@ -1,0 +1,16 @@
+{
+  "name": "how-to-make-a-cookbook",
+  "version": "1.0.0",
+  "description": "Local WordPress recipe site for the Morrison family cookbook",
+  "private": true,
+  "scripts": {
+    "start": "wp-env start",
+    "stop": "wp-env stop",
+    "destroy": "wp-env destroy",
+    "logs": "wp-env logs",
+    "build": "cd cookbook-recipes && npm run build"
+  },
+  "devDependencies": {
+    "@wordpress/env": "^10.18.0"
+  }
+}

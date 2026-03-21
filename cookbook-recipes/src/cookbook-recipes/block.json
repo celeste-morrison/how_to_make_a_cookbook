@@ -1,0 +1,59 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "cookbook/cookbook-recipes",
+	"version": "0.1.0",
+	"title": "Cookbook Recipes",
+	"category": "widgets",
+	"icon": "food",
+	"description": "A recipe block plugin for our family cookbook",
+	"example": {},
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"padding": true
+		}
+	},
+	"attributes": {
+		"recipeName": {
+			"type": "string",
+			"default": ""
+		},
+		"description": {
+			"type": "string",
+			"default": ""
+		},
+		"prepTime": {
+			"type": "string",
+			"default": ""
+		},
+		"cookTime": {
+			"type": "string",
+			"default": ""
+		},
+		"servings": {
+			"type": "string",
+			"default": ""
+		},
+		"ingredients": {
+			"type": "string",
+			"default": ""
+		},
+		"instructions": {
+			"type": "string",
+			"default": ""
+		},
+		"notes": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"textdomain": "cookbook-recipes",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css"
+}

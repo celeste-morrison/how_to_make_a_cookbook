@@ -1,0 +1,5 @@
+node_modules/
+cookbook-recipes/node_modules/
+cookbook-recipes/build/
+.wp-env/
+*.log
