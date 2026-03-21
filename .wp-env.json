@@ -1,7 +1,8 @@
 {
   "plugins": [
     "https://downloads.wordpress.org/plugin/mediavine-create.latest-stable.zip",
-"./cookbook-recipes"
+    "https://downloads.wordpress.org/plugin/wp-recipe-maker.latest-stable.zip",
+    "./cookbook-recipes"
   ],
   "config": {
     "WP_DEBUG": true,

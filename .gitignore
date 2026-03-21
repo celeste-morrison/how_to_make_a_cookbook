@@ -3,3 +3,7 @@ cookbook-recipes/node_modules/
 cookbook-recipes/build/
 .wp-env/
 *.log
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

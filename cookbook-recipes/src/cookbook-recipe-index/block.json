@@ -1,0 +1,16 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "cookbook/recipe-index",
+	"version": "0.1.0",
+	"title": "Recipe Index",
+	"category": "widgets",
+	"icon": "grid-view",
+	"description": "Searchable, filterable recipe listing",
+	"supports": { "html": false },
+	"textdomain": "cookbook-recipes",
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php",
+	"viewScript": "file:./view.js",
+	"style": "file:./style-index.css"
+}

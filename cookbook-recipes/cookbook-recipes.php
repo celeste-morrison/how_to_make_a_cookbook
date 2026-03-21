@@ -28,3 +28,17 @@ function cookbook_cookbook_recipes_block_init() {
 	wp_register_block_types_from_metadata_collection( __DIR__ . '/build', __DIR__ . '/build/blocks-manifest.php' );
 }
 add_action( 'init', 'cookbook_cookbook_recipes_block_init' );
+
+/**
+ * Shortcode [cookbook_single_recipe] — renders the WPRM recipe whose ID
+ * is passed in the `recipe` query parameter.
+ */
+function cookbook_single_recipe_shortcode() {
+	$id = isset( $_GET['recipe'] ) ? intval( $_GET['recipe'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification
+	if ( ! $id || get_post_type( $id ) !== 'wprm_recipe' ) {
+		return '<p>Recipe not found.</p>';
+	}
+
+	return do_shortcode( '[wprm-recipe id="' . $id . '"]' );
+}
+add_shortcode( 'cookbook_single_recipe', 'cookbook_single_recipe_shortcode' );
