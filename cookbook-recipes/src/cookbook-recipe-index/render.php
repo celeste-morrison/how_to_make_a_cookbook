@@ -1,62 +1,65 @@
 <?php
 /**
  * Server-side render for the Recipe Index block.
- * Queries published posts that contain the cookbook/cookbook-recipes block.
+ * Queries Mediavine Create recipe cards from the mv_creations table.
  */
 
-$posts = get_posts( [
-	'post_type'      => [ 'post', 'page' ],
-	'post_status'    => 'publish',
-	'numberposts'    => -1,
-	'orderby'        => 'title',
-	'order'          => 'ASC',
-] );
+global $wpdb;
+$creations_table = $wpdb->prefix . 'mv_creations';
+$supplies_table  = $wpdb->prefix . 'mv_supplies';
+
+// Verify Mediavine Create is installed.
+if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $creations_table ) ) !== $creations_table ) {
+	echo '<p>Mediavine Create is not active.</p>';
+	return;
+}
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$creations = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT id, title, category, canonical_post_id FROM {$creations_table} WHERE type = %s ORDER BY title ASC",
+		'recipe'
+	)
+);
 
 $recipe_data = [];
 $categories  = [];
 
-foreach ( $posts as $post ) {
-	if ( ! has_blocks( $post->post_content ) ) {
+foreach ( $creations as $creation ) {
+	if ( empty( $creation->canonical_post_id ) ) {
 		continue;
 	}
 
-	$recipe_block = null;
-	foreach ( parse_blocks( $post->post_content ) as $block ) {
-		if ( 'cookbook/cookbook-recipes' === $block['blockName'] ) {
-			$recipe_block = $block;
-			break;
-		}
-	}
-
-	if ( ! $recipe_block ) {
+	$url = get_permalink( intval( $creation->canonical_post_id ) );
+	if ( ! $url ) {
 		continue;
 	}
 
-	$attrs       = $recipe_block['attrs'];
-	$recipe_name = ! empty( $attrs['recipeName'] )
-		? wp_strip_all_tags( $attrs['recipeName'] )
-		: $post->post_title;
-
-	// Use the post's categories for filtering.
-	$terms = get_the_category( $post->ID );
-	$cats  = [];
-	foreach ( $terms as $term ) {
-		$cats[] = $term->name;
-		if ( ! in_array( $term->name, $categories, true ) ) {
-			$categories[] = $term->name;
+	$cats = [];
+	if ( ! empty( $creation->category ) ) {
+		$term = get_term( intval( $creation->category ), 'category' );
+		if ( $term && ! is_wp_error( $term ) ) {
+			$cats[] = $term->name;
+			if ( ! in_array( $term->name, $categories, true ) ) {
+				$categories[] = $term->name;
+			}
 		}
 	}
 
-	// Extract plain-text ingredients for search.
-	$ingredients_text = ! empty( $attrs['ingredients'] )
-		? wp_strip_all_tags( $attrs['ingredients'] )
-		: '';
+	// Fetch ingredient text for full-text search.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$ingredients = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT original_text FROM {$supplies_table} WHERE creation = %d AND type = 'ingredient'",
+			intval( $creation->id )
+		)
+	);
 
 	$recipe_data[] = [
-		'name'        => $recipe_name,
+		'name'        => $creation->title,
 		'categories'  => $cats,
-		'url'         => get_permalink( $post->ID ),
-		'ingredients' => $ingredients_text,
+		'url'         => $url,
+		'ingredients' => implode( ' ', $ingredients ),
 	];
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Creates WordPress posts for each recipe using the cookbook/cookbook-recipes block.
-Imports recipe data from import_recipes.py.
+Creates Mediavine Create recipe cards and associated WordPress posts
+for each recipe in import_recipes.py.
 
 Requirements: the wp-env environment must be running (npx wp-env start).
 
@@ -10,7 +10,6 @@ Usage:
 """
 
 import html
-import json
 import sys
 from requests.auth import HTTPBasicAuth
 import requests
@@ -23,11 +22,14 @@ from import_recipes import RECIPES  # noqa: E402
 WP_URL      = "http://localhost:8888"
 WP_USER     = "admin"
 WP_APP_PASS = "k5ZYfuRP5bGQpl6pePvz2ZF5"   # Application password from WP admin
-API_BASE    = f"{WP_URL}/wp-json/wp/v2"
+MV_API      = f"{WP_URL}/wp-json/mv-create/v1"
+WP_API      = f"{WP_URL}/wp-json/wp/v2"
 # ──────────────────────────────────────────────────────────────────────────────
 
 AUTH    = HTTPBasicAuth(WP_USER, WP_APP_PASS)
 HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
+
+MINUTE_IN_SECONDS = 60
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -35,7 +37,7 @@ HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
 def get_or_create_category(name: str) -> int:
     """Return the WP category ID for name, creating it if needed."""
     resp = requests.get(
-        f"{API_BASE}/categories",
+        f"{WP_API}/categories",
         params={"search": name, "per_page": 20},
         auth=AUTH,
         headers=HEADERS,
@@ -46,7 +48,7 @@ def get_or_create_category(name: str) -> int:
             return cat["id"]
 
     resp = requests.post(
-        f"{API_BASE}/categories",
+        f"{WP_API}/categories",
         json={"name": name},
         auth=AUTH,
         headers=HEADERS,
@@ -57,81 +59,96 @@ def get_or_create_category(name: str) -> int:
     return cat_id
 
 
-def li_items(lines: list) -> str:
-    """Wrap each line in <li> tags for use as a RichText multiline value."""
-    return "".join(f"<li>{html.escape(line.strip())}</li>" for line in lines if line.strip())
+def card_exists(title: str) -> bool:
+    """Return True if a Mediavine Create recipe card with this title already exists."""
+    resp = requests.get(
+        f"{MV_API}/creations",
+        params={"search": title, "type": "recipe", "per_page": 50},
+        auth=AUTH,
+        headers=HEADERS,
+    )
+    if resp.status_code != 200:
+        return False
+    payload = resp.json()
+    # MC API wraps results in a 'data' key
+    items = payload.get("data", payload) if isinstance(payload, dict) else payload
+    if not isinstance(items, list):
+        return False
+    return any(c.get("title", "").lower() == title.lower() for c in items)
 
 
-def build_block(recipe: dict) -> str:
-    """
-    Produce serialized Gutenberg block markup for cookbook/cookbook-recipes.
+def create_card(recipe: dict, category_id: int | None) -> dict:
+    """POST a new Mediavine Create recipe card and return the created object."""
+    prep_min = recipe.get("prep_time") or 0
+    cook_min = recipe.get("cook_time") or 0
+    servings = recipe.get("servings", "")
 
-    Attribute storage mirrors what save.js serialises:
-      - ingredients / instructions: inner HTML of the <ul>/<ol> (one <li> per item)
-      - all other fields: plain strings
-    """
-    name         = recipe.get("name", "")
-    description  = recipe.get("description", "")
-    prep_time    = recipe.get("prep_time", "")
-    cook_time    = recipe.get("cook_time", "")
-    servings     = str(recipe.get("servings", "")) if recipe.get("servings") else ""
-    notes        = recipe.get("notes", "")
-    ingredients  = li_items(recipe.get("ingredients", []))
-    instructions = li_items(recipe.get("instructions", []))
-
-    attrs = {
-        "recipeName":  name,
-        "description": description,
-        "prepTime":    str(prep_time) if prep_time else "",
-        "cookTime":    str(cook_time) if cook_time else "",
-        "servings":    servings,
-        "ingredients": ingredients,
-        "instructions": instructions,
-        "notes":       notes,
-    }
-
-    # Build the saved HTML that save.js produces.
-    meta_html = ""
-    if prep_time or cook_time or servings:
-        parts = []
-        if prep_time:
-            parts.append(f"<span><strong>Prep:</strong> {html.escape(str(prep_time))}</span>")
-        if cook_time:
-            parts.append(f"<span><strong>Cook:</strong> {html.escape(str(cook_time))}</span>")
-        if servings:
-            parts.append(f"<span><strong>Serves:</strong> {html.escape(servings)}</span>")
-        meta_html = f'<div class="recipe-meta">{"".join(parts)}</div>'
-
-    notes_html = f'<p class="recipe-notes">{html.escape(notes)}</p>' if notes else ""
-
-    inner_html = (
-        f'<h2 class="recipe-name">{html.escape(name)}</h2>'
-        f'<p class="recipe-description">{html.escape(description)}</p>'
-        f"{meta_html}"
-        f"<h3>Ingredients</h3>"
-        f'<ul class="recipe-ingredients">{ingredients}</ul>'
-        f"<h3>Instructions</h3>"
-        f'<ol class="recipe-instructions">{instructions}</ol>'
-        f"{notes_html}"
+    steps = recipe.get("instructions", [])
+    instructions_html = (
+        "<ol>" + "".join(f"<li>{html.escape(s.strip())}</li>" for s in steps if s.strip()) + "</ol>"
+        if steps else ""
     )
 
-    block_comment = f"<!-- wp:cookbook/cookbook-recipes {json.dumps(attrs, ensure_ascii=False)} -->"
-    block_div     = f'<div class="wp-block-cookbook-cookbook-recipes cookbook-recipe">{inner_html}</div>'
-    block_close   = "<!-- /wp:cookbook/cookbook-recipes -->"
+    body = {
+        "title":        recipe["name"],
+        "type":         "recipe",
+        "description":  recipe.get("description", ""),
+        "instructions": instructions_html,
+        "notes":        recipe.get("notes", ""),
+        "yield":        str(servings) if servings else "",
+    }
+    if prep_min:
+        body["prep_time"]   = int(prep_min) * MINUTE_IN_SECONDS
+    if cook_min:
+        body["active_time"] = int(cook_min) * MINUTE_IN_SECONDS
+    if category_id:
+        body["category"] = category_id
 
-    return f"{block_comment}\n{block_div}\n{block_close}"
+    resp = requests.post(f"{MV_API}/creations", json=body, auth=AUTH, headers=HEADERS)
+    resp.raise_for_status()
+    payload = resp.json()
+    return payload.get("data", payload) if isinstance(payload, dict) and "data" in payload else payload
 
 
-def post_exists(title: str) -> bool:
-    """Return True if a published post with this exact title already exists."""
-    resp = requests.get(
-        f"{API_BASE}/posts",
-        params={"search": title, "per_page": 20, "status": "publish"},
+def set_ingredients(card_id: int, ingredients: list) -> None:
+    """Set ingredient supplies for a creation card."""
+    supplies = [
+        {"original_text": ing.strip(), "type": "ingredient", "position": i}
+        for i, ing in enumerate(ingredients)
+        if ing.strip()
+    ]
+    if not supplies:
+        return
+
+    resp = requests.post(
+        f"{MV_API}/creations/{card_id}/supplies",
+        json={"id": card_id, "type": "ingredient", "data": supplies},
         auth=AUTH,
         headers=HEADERS,
     )
     resp.raise_for_status()
-    return any(p["title"]["rendered"] == title for p in resp.json())
+
+
+def create_post(card_id: int, title: str, category_ids: list) -> dict:
+    """
+    Create a published WordPress post embedding the Mediavine Create shortcode.
+    Saving the post triggers the plugin's post_updated hook, which automatically
+    links the card to the post (sets associated_posts and canonical_post_id).
+    """
+    shortcode = f'[mv_create key="{card_id}" type="recipe" title="{title}"]'
+    resp = requests.post(
+        f"{WP_API}/posts",
+        json={
+            "title":      title,
+            "content":    shortcode,
+            "status":     "publish",
+            "categories": category_ids,
+        },
+        auth=AUTH,
+        headers=HEADERS,
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -139,7 +156,7 @@ def post_exists(title: str) -> bool:
 def main():
     print(f"Connecting to WordPress at {WP_URL}…")
     try:
-        requests.get(f"{API_BASE}/posts", auth=AUTH, timeout=5).raise_for_status()
+        requests.get(f"{WP_API}/posts", auth=AUTH, timeout=5).raise_for_status()
     except Exception as exc:
         print(f"ERROR: Cannot reach WordPress — {exc}")
         print("Make sure wp-env is running: npx wp-env start")
@@ -151,39 +168,32 @@ def main():
     for recipe in RECIPES:
         name = recipe.get("name", "Untitled Recipe")
 
-        if post_exists(name):
+        if card_exists(name):
             print(f"  SKIP  {name!r} (already exists)")
             skipped += 1
             continue
 
-        # Resolve category.
         cat_name = recipe.get("category", "")
+        cat_id   = None
+        cat_ids  = []
         if cat_name:
             if cat_name not in category_cache:
                 category_cache[cat_name] = get_or_create_category(cat_name)
-            cat_ids = [category_cache[cat_name]]
-        else:
-            cat_ids = []
+            cat_id  = category_cache[cat_name]
+            cat_ids = [cat_id]
 
-        post_body = {
-            "title":      name,
-            "content":    build_block(recipe),
-            "status":     "publish",
-            "categories": cat_ids,
-        }
+        try:
+            card    = create_card(recipe, cat_id)
+            card_id = card["id"]
 
-        resp = requests.post(
-            f"{API_BASE}/posts",
-            json=post_body,
-            auth=AUTH,
-            headers=HEADERS,
-        )
-        if resp.status_code in (200, 201):
-            post = resp.json()
+            set_ingredients(card_id, recipe.get("ingredients", []))
+
+            post = create_post(card_id, name, cat_ids)
             print(f"  OK    {name!r}  →  {post['link']}")
             created += 1
-        else:
-            print(f"  FAIL  {name!r}  status={resp.status_code}  {resp.text[:120]}")
+
+        except Exception as exc:
+            print(f"  FAIL  {name!r}  {exc}")
 
     print(f"\nDone — {created} created, {skipped} skipped.")
 
