@@ -131,18 +131,17 @@ def set_ingredients(card_id: int, ingredients: list) -> None:
 
 def create_post(card_id: int, title: str, category_ids: list) -> dict:
     """
-    Create a published WordPress post embedding the Mediavine Create shortcode.
-    Saving the post triggers the plugin's post_updated hook, which automatically
-    links the card to the post (sets associated_posts and canonical_post_id).
+    Create a published WordPress page embedding the Mediavine Create shortcode.
+    Saving the page triggers the plugin's post_updated hook, which automatically
+    links the card to the page (sets associated_posts and canonical_post_id).
     """
     shortcode = f'[mv_create key="{card_id}" type="recipe" title="{title}"]'
     resp = requests.post(
-        f"{WP_API}/posts",
+        f"{WP_API}/pages",
         json={
-            "title":      title,
-            "content":    shortcode,
-            "status":     "publish",
-            "categories": category_ids,
+            "title":   title,
+            "content": shortcode,
+            "status":  "publish",
         },
         auth=AUTH,
         headers=HEADERS,
