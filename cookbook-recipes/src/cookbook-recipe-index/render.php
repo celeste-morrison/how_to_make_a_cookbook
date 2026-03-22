@@ -1,15 +1,11 @@
 <?php
 /**
  * Server-side render for the Recipe Index block.
+ * Queries published posts that contain the cookbook/cookbook-recipes block.
  */
 
-if ( ! function_exists( 'WPRM_Recipe_Manager' ) && ! class_exists( 'WPRM_Recipe_Manager' ) ) {
-	echo '<p>WP Recipe Maker is not active.</p>';
-	return;
-}
-
-$recipes = get_posts( [
-	'post_type'      => 'wprm_recipe',
+$posts = get_posts( [
+	'post_type'      => [ 'post', 'page' ],
 	'post_status'    => 'publish',
 	'numberposts'    => -1,
 	'orderby'        => 'title',
@@ -19,39 +15,48 @@ $recipes = get_posts( [
 $recipe_data = [];
 $categories  = [];
 
-foreach ( $recipes as $post ) {
-	$terms = get_the_terms( $post->ID, 'wprm_course' );
+foreach ( $posts as $post ) {
+	if ( ! has_blocks( $post->post_content ) ) {
+		continue;
+	}
+
+	$recipe_block = null;
+	foreach ( parse_blocks( $post->post_content ) as $block ) {
+		if ( 'cookbook/cookbook-recipes' === $block['blockName'] ) {
+			$recipe_block = $block;
+			break;
+		}
+	}
+
+	if ( ! $recipe_block ) {
+		continue;
+	}
+
+	$attrs       = $recipe_block['attrs'];
+	$recipe_name = ! empty( $attrs['recipeName'] )
+		? wp_strip_all_tags( $attrs['recipeName'] )
+		: $post->post_title;
+
+	// Use the post's categories for filtering.
+	$terms = get_the_category( $post->ID );
 	$cats  = [];
-
-	if ( $terms && ! is_wp_error( $terms ) ) {
-		foreach ( $terms as $term ) {
-			$cats[] = $term->name;
-			if ( ! in_array( $term->name, $categories, true ) ) {
-				$categories[] = $term->name;
-			}
+	foreach ( $terms as $term ) {
+		$cats[] = $term->name;
+		if ( ! in_array( $term->name, $categories, true ) ) {
+			$categories[] = $term->name;
 		}
 	}
 
-	$ingredient_names = [];
-	$ingredient_groups = get_post_meta( $post->ID, 'wprm_ingredients', true );
-	if ( is_array( $ingredient_groups ) ) {
-		foreach ( $ingredient_groups as $group ) {
-			if ( ! empty( $group['ingredients'] ) && is_array( $group['ingredients'] ) ) {
-				foreach ( $group['ingredients'] as $ingredient ) {
-					if ( ! empty( $ingredient['name'] ) ) {
-						$ingredient_names[] = $ingredient['name'];
-					}
-				}
-			}
-		}
-	}
+	// Extract plain-text ingredients for search.
+	$ingredients_text = ! empty( $attrs['ingredients'] )
+		? wp_strip_all_tags( $attrs['ingredients'] )
+		: '';
 
 	$recipe_data[] = [
-		'id'          => $post->ID,
-		'name'        => $post->post_title,
+		'name'        => $recipe_name,
 		'categories'  => $cats,
-		'url'         => home_url( '/recipe/?recipe=' . $post->ID ),
-		'ingredients' => $ingredient_names,
+		'url'         => get_permalink( $post->ID ),
+		'ingredients' => $ingredients_text,
 	];
 }
 
@@ -85,7 +90,7 @@ sort( $categories );
 				class="recipe-card"
 				data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
 				data-categories="<?php echo esc_attr( implode( ',', array_map( 'mb_strtolower', $recipe['categories'] ) ) ); ?>"
-			data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
+				data-ingredients="<?php echo esc_attr( mb_strtolower( $recipe['ingredients'] ) ); ?>"
 			>
 				<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
 				<?php if ( ! empty( $recipe['categories'] ) ) : ?>
