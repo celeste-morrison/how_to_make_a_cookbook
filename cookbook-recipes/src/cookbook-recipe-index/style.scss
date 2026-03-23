@@ -1,8 +1,8 @@
 // Color palette
 $white: #ffffff;
 $black: #1a1a1a;
-$olive: #6b7c47;
-$merlot: #722f37;
+$sage: #7c9a6e;
+$plum: #4a2040;
 
 .cookbook-recipe-index {
 	.recipe-index-controls {
@@ -14,7 +14,7 @@ $merlot: #722f37;
 		width: 100%;
 		padding: 0.6rem 1rem;
 		font-size: 1rem;
-		border: 1px solid lighten($olive, 30%);
+		border: 1px solid lighten($sage, 30%);
 		border-radius: 6px;
 		margin-bottom: 1rem;
 		box-sizing: border-box;
@@ -23,7 +23,7 @@ $merlot: #722f37;
 
 		&:focus {
 			outline: none;
-			border-color: $merlot;
+			border-color: $plum;
 		}
 	}
 
@@ -35,7 +35,7 @@ $merlot: #722f37;
 
 	.category-btn {
 		padding: 0.35rem 1rem;
-		border: 1px solid lighten($olive, 20%);
+		border: 1px solid lighten($sage, 20%);
 		border-radius: 20px;
 		background: $white;
 		cursor: pointer;
@@ -43,14 +43,14 @@ $merlot: #722f37;
 		transition: background 0.15s, border-color 0.15s, color 0.15s;
 
 		&.active {
-			background: $merlot;
+			background: $plum;
 			color: $white;
-			border-color: $merlot;
+			border-color: $plum;
 		}
 
 		&:hover:not(.active) {
-			background: lighten($olive, 48%);
-			border-color: $olive;
+			background: lighten($sage, 48%);
+			border-color: $sage;
 		}
 	}
 
@@ -66,7 +66,7 @@ $merlot: #722f37;
 		flex-direction: column;
 		gap: 0.3rem;
 		padding: 1rem;
-		border: 1px solid lighten($olive, 35%);
+		border: 1px solid lighten($sage, 35%);
 		border-radius: 8px;
 		text-decoration: none;
 		color: inherit;
@@ -74,8 +74,8 @@ $merlot: #722f37;
 		transition: box-shadow 0.2s, border-color 0.2s;
 
 		&:hover {
-			box-shadow: 0 2px 10px rgba($merlot, 0.15);
-			border-color: $merlot;
+			box-shadow: 0 2px 10px rgba($plum, 0.15);
+			border-color: $plum;
 		}
 	}
 
@@ -88,14 +88,14 @@ $merlot: #722f37;
 
 	.recipe-card-category {
 		font-size: 0.75rem;
-		color: $olive;
+		color: $sage;
 		text-transform: uppercase;
 		letter-spacing: 0.04em;
 	}
 
 	.recipe-no-results {
 		text-align: center;
-		color: $olive;
+		color: $sage;
 		padding: 2rem 0;
 	}
 }
