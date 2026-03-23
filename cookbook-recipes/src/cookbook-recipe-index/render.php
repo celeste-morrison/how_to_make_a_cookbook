@@ -63,14 +63,37 @@ sort( $categories );
 ?>
 <div <?php echo get_block_wrapper_attributes( [ 'class' => 'cookbook-recipe-index' ] ); ?>>
 
-	<div class="recipe-index-controls">
+	<div class="recipe-main">
 		<input
 			type="search"
 			class="recipe-search"
 			placeholder="Search recipes…"
 			aria-label="Search recipes"
 		>
-		<?php if ( ! empty( $categories ) ) : ?>
+
+		<div class="recipe-grid">
+			<?php foreach ( $recipe_data as $recipe ) : ?>
+				<a
+					href="<?php echo esc_url( $recipe['url'] ); ?>"
+					class="recipe-card"
+					data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
+					data-categories="<?php echo esc_attr( mb_strtolower( $recipe['category'] ) ); ?>"
+					data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
+				>
+					<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
+					<?php if ( $recipe['category'] ) : ?>
+						<span class="recipe-card-category"><?php echo esc_html( $recipe['category'] ); ?></span>
+					<?php endif; ?>
+				</a>
+			<?php endforeach; ?>
+		</div>
+
+		<p class="recipe-no-results" style="display:none">No recipes found.</p>
+	</div>
+
+	<?php if ( ! empty( $categories ) ) : ?>
+	<aside class="recipe-sidebar">
+		<p class="recipe-sidebar-heading">Categories</p>
 		<div class="recipe-categories" role="group" aria-label="Filter by category">
 			<button class="category-btn active" data-category="all">All</button>
 			<?php foreach ( $categories as $cat ) : ?>
@@ -79,26 +102,7 @@ sort( $categories );
 				</button>
 			<?php endforeach; ?>
 		</div>
-		<?php endif; ?>
-	</div>
-
-	<div class="recipe-grid">
-		<?php foreach ( $recipe_data as $recipe ) : ?>
-			<a
-				href="<?php echo esc_url( $recipe['url'] ); ?>"
-				class="recipe-card"
-				data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
-				data-categories="<?php echo esc_attr( mb_strtolower( $recipe['category'] ) ); ?>"
-				data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
-			>
-				<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
-				<?php if ( $recipe['category'] ) : ?>
-					<span class="recipe-card-category"><?php echo esc_html( $recipe['category'] ); ?></span>
-				<?php endif; ?>
-			</a>
-		<?php endforeach; ?>
-	</div>
-
-	<p class="recipe-no-results" style="display:none">No recipes found.</p>
+	</aside>
+	<?php endif; ?>
 
 </div>

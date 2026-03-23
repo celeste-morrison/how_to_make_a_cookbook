@@ -5,8 +5,13 @@ $sage: #7c9a6e;
 $plum: #4a2040;
 
 .cookbook-recipe-index {
-	.recipe-index-controls {
-		margin-bottom: 1.5rem;
+	display: flex;
+	gap: 2rem;
+	align-items: flex-start;
+
+	.recipe-main {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.recipe-search {
@@ -27,38 +32,10 @@ $plum: #4a2040;
 		}
 	}
 
-	.recipe-categories {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.category-btn {
-		padding: 0.35rem 1rem;
-		border: 1px solid lighten($sage, 20%);
-		border-radius: 20px;
-		background: $white;
-		cursor: pointer;
-		font-size: 0.875rem;
-		transition: background 0.15s, border-color 0.15s, color 0.15s;
-
-		&.active {
-			background: $plum;
-			color: $white;
-			border-color: $plum;
-		}
-
-		&:hover:not(.active) {
-			background: lighten($sage, 48%);
-			border-color: $sage;
-		}
-	}
-
 	.recipe-grid {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-		margin-top: 1.5rem;
 	}
 
 	.recipe-card {
@@ -97,5 +74,50 @@ $plum: #4a2040;
 		text-align: center;
 		color: $sage;
 		padding: 2rem 0;
+	}
+
+	.recipe-sidebar {
+		width: 180px;
+		flex-shrink: 0;
+		position: sticky;
+		top: 2rem;
+	}
+
+	.recipe-sidebar-heading {
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: $sage;
+		margin: 0 0 0.75rem;
+		font-weight: 600;
+	}
+
+	.recipe-categories {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.category-btn {
+		display: block;
+		width: 100%;
+		text-align: left;
+		padding: 0.4rem 0.75rem;
+		border: 1px solid transparent;
+		border-radius: 6px;
+		background: transparent;
+		cursor: pointer;
+		font-size: 0.875rem;
+		color: $black;
+		transition: background 0.15s, color 0.15s;
+
+		&.active {
+			background: $plum;
+			color: $white;
+		}
+
+		&:hover:not(.active) {
+			background: lighten($sage, 44%);
+		}
 	}
 }
