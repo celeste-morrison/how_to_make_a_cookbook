@@ -30,15 +30,45 @@ function cookbook_cookbook_recipes_block_init() {
 add_action( 'init', 'cookbook_cookbook_recipes_block_init' );
 
 /**
- * Shortcode [cookbook_single_recipe] — renders the WPRM recipe whose ID
- * is passed in the `recipe` query parameter.
+ * Add rewrite rule for /recipe/{name}/ and register the query var.
+ */
+function cookbook_recipe_rewrite_rules() {
+	add_rewrite_rule( '^recipe/([^/]+)/?$', 'index.php?pagename=recipe&cookbook_recipe_name=$matches[1]', 'top' );
+}
+add_action( 'init', 'cookbook_recipe_rewrite_rules' );
+
+function cookbook_recipe_query_vars( $vars ) {
+	$vars[] = 'cookbook_recipe_name';
+	return $vars;
+}
+add_filter( 'query_vars', 'cookbook_recipe_query_vars' );
+
+/**
+ * Shortcode [cookbook_single_recipe] — renders the Mediavine Create card
+ * whose title slug matches the /recipe/{name}/ URL.
  */
 function cookbook_single_recipe_shortcode() {
-	$id = isset( $_GET['recipe'] ) ? intval( $_GET['recipe'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification
-	if ( ! $id || get_post_type( $id ) !== 'wprm_recipe' ) {
+	$recipe_name = get_query_var( 'cookbook_recipe_name' );
+
+	if ( ! $recipe_name ) {
 		return '<p>Recipe not found.</p>';
 	}
 
-	return do_shortcode( '[wprm-recipe id="' . $id . '"]' );
+	global $wpdb;
+	$rows = $wpdb->get_results( "SELECT id, title FROM {$wpdb->prefix}mv_creations WHERE title NOT LIKE '% Creation'" );
+
+	$create_id = 0;
+	foreach ( $rows as $row ) {
+		if ( sanitize_title( $row->title ) === $recipe_name ) {
+			$create_id = (int) $row->id;
+			break;
+		}
+	}
+
+	if ( ! $create_id ) {
+		return '<p>Recipe not found.</p>';
+	}
+
+	return do_shortcode( '[mv_create key="' . $create_id . '"]' );
 }
 add_shortcode( 'cookbook_single_recipe', 'cookbook_single_recipe_shortcode' );

@@ -1,57 +1,61 @@
 <?php
 /**
  * Server-side render for the Recipe Index block.
+ * Uses Mediavine Create cards as the recipe source.
  */
 
-if ( ! function_exists( 'WPRM_Recipe_Manager' ) && ! class_exists( 'WPRM_Recipe_Manager' ) ) {
-	echo '<p>WP Recipe Maker is not active.</p>';
-	return;
-}
+global $wpdb;
 
-$recipes = get_posts( [
-	'post_type'      => 'wprm_recipe',
-	'post_status'    => 'publish',
-	'numberposts'    => -1,
-	'orderby'        => 'title',
-	'order'          => 'ASC',
-] );
+$rows = $wpdb->get_results(
+	"SELECT c.id, c.title, c.category
+	FROM {$wpdb->prefix}mv_creations c
+	WHERE c.title NOT LIKE '% Creation'
+	ORDER BY c.title ASC"
+);
 
 $recipe_data = [];
 $categories  = [];
 
-foreach ( $recipes as $post ) {
-	$terms = get_the_terms( $post->ID, 'wprm_course' );
-	$cats  = [];
+foreach ( $rows as $row ) {
+	// Get ingredients from supplies table.
+	$supplies = $wpdb->get_col( $wpdb->prepare(
+		"SELECT original_text FROM {$wpdb->prefix}mv_supplies WHERE creation = %d",
+		$row->id
+	) );
 
-	if ( $terms && ! is_wp_error( $terms ) ) {
-		foreach ( $terms as $term ) {
-			$cats[] = $term->name;
-			if ( ! in_array( $term->name, $categories, true ) ) {
-				$categories[] = $term->name;
+	// Get category term name if set.
+	$cat_name = '';
+	if ( $row->category ) {
+		$term = get_term( (int) $row->category );
+		if ( $term && ! is_wp_error( $term ) ) {
+			$cat_name = $term->name;
+		}
+	}
+
+	// Fall back to wprm_course taxonomy on the matching wprm_recipe for category.
+	if ( ! $cat_name ) {
+		$wprm = $wpdb->get_row( $wpdb->prepare(
+			"SELECT ID FROM {$wpdb->posts} WHERE post_type = 'wprm_recipe' AND post_status = 'publish' AND post_title = %s LIMIT 1",
+			$row->title
+		) );
+		if ( $wprm ) {
+			$terms = get_the_terms( $wprm->ID, 'wprm_course' );
+			if ( $terms && ! is_wp_error( $terms ) ) {
+				$cat_name = $terms[0]->name;
 			}
 		}
 	}
 
-	$ingredient_names = [];
-	$ingredient_groups = get_post_meta( $post->ID, 'wprm_ingredients', true );
-	if ( is_array( $ingredient_groups ) ) {
-		foreach ( $ingredient_groups as $group ) {
-			if ( ! empty( $group['ingredients'] ) && is_array( $group['ingredients'] ) ) {
-				foreach ( $group['ingredients'] as $ingredient ) {
-					if ( ! empty( $ingredient['name'] ) ) {
-						$ingredient_names[] = $ingredient['name'];
-					}
-				}
-			}
-		}
+	if ( $cat_name && ! in_array( $cat_name, $categories, true ) ) {
+		$categories[] = $cat_name;
 	}
 
 	$recipe_data[] = [
-		'id'          => $post->ID,
-		'name'        => $post->post_title,
-		'categories'  => $cats,
-		'url'         => home_url( '/recipe/?recipe=' . $post->ID ),
-		'ingredients' => $ingredient_names,
+		'id'          => $row->id,
+		'name'        => $row->title,
+		'category'    => $cat_name,
+		'url'         => home_url( '/recipe/' . sanitize_title( $row->title ) . '/' ),
+		'ingredients' => array_filter( $supplies ),
 	];
 }
 
@@ -84,12 +88,12 @@ sort( $categories );
 				href="<?php echo esc_url( $recipe['url'] ); ?>"
 				class="recipe-card"
 				data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
-				data-categories="<?php echo esc_attr( implode( ',', array_map( 'mb_strtolower', $recipe['categories'] ) ) ); ?>"
-			data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
+				data-categories="<?php echo esc_attr( mb_strtolower( $recipe['category'] ) ); ?>"
+				data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
 			>
 				<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
-				<?php if ( ! empty( $recipe['categories'] ) ) : ?>
-					<span class="recipe-card-category"><?php echo esc_html( $recipe['categories'][0] ); ?></span>
+				<?php if ( $recipe['category'] ) : ?>
+					<span class="recipe-card-category"><?php echo esc_html( $recipe['category'] ); ?></span>
 				<?php endif; ?>
 			</a>
 		<?php endforeach; ?>
