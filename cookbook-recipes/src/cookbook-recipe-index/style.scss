@@ -5,13 +5,10 @@ $sage: #7c9a6e;
 $plum: #4a2040;
 
 .cookbook-recipe-index {
-	display: flex;
-	gap: 2rem;
-	align-items: flex-start;
+	display: block;
 
 	.recipe-main {
-		flex: 1;
-		min-width: 0;
+		width: 100%;
 	}
 
 	.recipe-search {
@@ -77,11 +74,16 @@ $plum: #4a2040;
 	}
 
 	.recipe-sidebar {
-		width: 180px;
-		flex-shrink: 0;
-		position: sticky;
-		top: 2rem;
-		order: -1;
+		position: fixed;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 160px;
+		padding: 2rem 1rem 2rem 1.25rem;
+		overflow-y: auto;
+		border-right: 1px solid lighten($sage, 35%);
+		background: $white;
+		z-index: 100;
 	}
 
 	.recipe-sidebar-heading {
