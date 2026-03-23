@@ -47,14 +47,29 @@ function cookbook_admin_menu() {
 }
 add_action( 'admin_menu', 'cookbook_admin_menu' );
 
+function cookbook_render_checkboxes( $terms, $post_id, $current_ids, $depth = 0 ) {
+	foreach ( $terms as $term ) {
+		// Skip root container terms that are just organisational wrappers.
+		if ( 0 === $depth && 'uncategorized' === $term->slug ) {
+			continue;
+		}
+		$checked  = in_array( $term->term_id, $current_ids, true ) ? 'checked' : '';
+		$class    = $depth > 0 ? 'depth-' . $depth : '';
+		echo '<label class="' . $class . '"><input type="checkbox" name="recipe_category[' . $post_id . '][]" value="' . $term->term_id . '" ' . $checked . '> ' . esc_html( $term->name ) . '</label>';
+		$children = get_terms( [ 'taxonomy' => 'category', 'hide_empty' => false, 'parent' => $term->term_id ] );
+		if ( $children ) {
+			cookbook_render_checkboxes( $children, $post_id, $current_ids, $depth + 1 );
+		}
+	}
+}
+
 function cookbook_admin_page() {
 	global $wpdb;
 
 	// Handle save.
 	if ( isset( $_POST['cookbook_nonce'] ) && wp_verify_nonce( $_POST['cookbook_nonce'], 'cookbook_save_categories' ) ) {
 		$assignments = isset( $_POST['recipe_category'] ) ? (array) $_POST['recipe_category'] : [];
-		// Also clear recipes that had no checkboxes checked (not present in POST).
-		$all_posts = get_posts( [ 'post_type' => 'mv_create', 'post_status' => 'publish', 'numberposts' => -1, 'fields' => 'ids' ] );
+		$all_posts   = get_posts( [ 'post_type' => 'mv_create', 'post_status' => 'publish', 'numberposts' => -1, 'fields' => 'ids' ] );
 		foreach ( $all_posts as $pid ) {
 			$term_ids = isset( $assignments[ $pid ] ) ? array_map( 'intval', (array) $assignments[ $pid ] ) : [];
 			wp_set_object_terms( $pid, $term_ids, 'category' );
@@ -72,26 +87,7 @@ function cookbook_admin_page() {
 		'exclude'     => $wpdb->get_col( "SELECT ID FROM {$wpdb->posts} WHERE post_type='mv_create' AND post_title LIKE '% Creation'" ),
 	] );
 
-	// Build category options (hierarchical).
-	$categories = get_terms( [
-		'taxonomy'   => 'category',
-		'hide_empty' => false,
-		'parent'     => 0,
-	] );
-
-	function cookbook_category_options( $terms, $depth = 0 ) {
-		$output = '';
-		foreach ( $terms as $term ) {
-			$output .= '<option value="' . $term->term_id . '">' . str_repeat( '&nbsp;&nbsp;', $depth ) . esc_html( $term->name ) . '</option>';
-			$children = get_terms( [ 'taxonomy' => 'category', 'hide_empty' => false, 'parent' => $term->term_id ] );
-			if ( $children ) {
-				$output .= cookbook_category_options( $children, $depth + 1 );
-			}
-		}
-		return $output;
-	}
-
-	$cat_options = cookbook_category_options( $categories );
+	$root_terms = get_terms( [ 'taxonomy' => 'category', 'hide_empty' => false, 'parent' => 0 ] );
 
 	echo '<div class="wrap"><h1>Recipe Categories</h1>';
 	echo '<form method="post">';
@@ -100,27 +96,9 @@ function cookbook_admin_page() {
 	echo '<table class="widefat striped"><thead><tr><th>Recipe</th><th>Categories</th></tr></thead><tbody>';
 
 	foreach ( $posts as $post ) {
-		$current_terms = wp_get_object_terms( $post->ID, 'category', [ 'fields' => 'ids' ] );
+		$current_ids = wp_get_object_terms( $post->ID, 'category', [ 'fields' => 'ids' ] );
 		echo '<tr><td>' . esc_html( $post->post_title ) . '</td><td><div class="cb-cats">';
-
-		function cookbook_render_checkboxes( $terms, $post_id, $current_ids, $depth = 0 ) {
-			foreach ( $terms as $term ) {
-				$checked = in_array( $term->term_id, $current_ids, true ) ? 'checked' : '';
-				$class   = $depth > 0 ? 'depth-' . $depth : '';
-				echo '<label class="' . $class . '"><input type="checkbox" name="recipe_category[' . $post_id . '][]" value="' . $term->term_id . '" ' . $checked . '> ' . esc_html( $term->name ) . '</label>';
-				$children = get_terms( [ 'taxonomy' => 'category', 'hide_empty' => false, 'parent' => $term->term_id ] );
-				if ( $children ) {
-					cookbook_render_checkboxes( $children, $post_id, $current_ids, $depth + 1 );
-				}
-			}
-		}
-
-		cookbook_render_checkboxes(
-			get_terms( [ 'taxonomy' => 'category', 'hide_empty' => false, 'parent' => 0 ] ),
-			$post->ID,
-			(array) $current_terms
-		);
-
+		cookbook_render_checkboxes( $root_terms, $post->ID, (array) $current_ids );
 		echo '</div></td></tr>';
 	}
 
