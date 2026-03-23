@@ -1,30 +1,44 @@
 <?php
 /**
  * Server-side render for the Recipe Index block.
+ * Queries Mediavine Create recipe cards from the mv_creations table.
  */
 
-if ( ! function_exists( 'WPRM_Recipe_Manager' ) && ! class_exists( 'WPRM_Recipe_Manager' ) ) {
-	echo '<p>WP Recipe Maker is not active.</p>';
+global $wpdb;
+$creations_table = $wpdb->prefix . 'mv_creations';
+$supplies_table  = $wpdb->prefix . 'mv_supplies';
+
+// Verify Mediavine Create is installed.
+if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $creations_table ) ) !== $creations_table ) {
+	echo '<p>Mediavine Create is not active.</p>';
 	return;
 }
 
-$recipes = get_posts( [
-	'post_type'      => 'wprm_recipe',
-	'post_status'    => 'publish',
-	'numberposts'    => -1,
-	'orderby'        => 'title',
-	'order'          => 'ASC',
-] );
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$creations = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT id, title, category, canonical_post_id FROM {$creations_table} WHERE type = %s ORDER BY title ASC",
+		'recipe'
+	)
+);
 
 $recipe_data = [];
 $categories  = [];
 
-foreach ( $recipes as $post ) {
-	$terms = get_the_terms( $post->ID, 'wprm_course' );
-	$cats  = [];
+foreach ( $creations as $creation ) {
+	if ( empty( $creation->canonical_post_id ) ) {
+		continue;
+	}
 
-	if ( $terms && ! is_wp_error( $terms ) ) {
-		foreach ( $terms as $term ) {
+	$url = get_permalink( intval( $creation->canonical_post_id ) );
+	if ( ! $url ) {
+		continue;
+	}
+
+	$cats = [];
+	if ( ! empty( $creation->category ) ) {
+		$term = get_term( intval( $creation->category ), 'category' );
+		if ( $term && ! is_wp_error( $term ) ) {
 			$cats[] = $term->name;
 			if ( ! in_array( $term->name, $categories, true ) ) {
 				$categories[] = $term->name;
@@ -32,26 +46,20 @@ foreach ( $recipes as $post ) {
 		}
 	}
 
-	$ingredient_names = [];
-	$ingredient_groups = get_post_meta( $post->ID, 'wprm_ingredients', true );
-	if ( is_array( $ingredient_groups ) ) {
-		foreach ( $ingredient_groups as $group ) {
-			if ( ! empty( $group['ingredients'] ) && is_array( $group['ingredients'] ) ) {
-				foreach ( $group['ingredients'] as $ingredient ) {
-					if ( ! empty( $ingredient['name'] ) ) {
-						$ingredient_names[] = $ingredient['name'];
-					}
-				}
-			}
-		}
-	}
+	// Fetch ingredient text for full-text search.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$ingredients = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT original_text FROM {$supplies_table} WHERE creation = %d AND type = 'ingredient'",
+			intval( $creation->id )
+		)
+	);
 
 	$recipe_data[] = [
-		'id'          => $post->ID,
-		'name'        => $post->post_title,
+		'name'        => $creation->title,
 		'categories'  => $cats,
-		'url'         => home_url( '/recipe/?recipe=' . $post->ID ),
-		'ingredients' => $ingredient_names,
+		'url'         => $url,
+		'ingredients' => implode( ' ', $ingredients ),
 	];
 }
 
@@ -85,7 +93,7 @@ sort( $categories );
 				class="recipe-card"
 				data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
 				data-categories="<?php echo esc_attr( implode( ',', array_map( 'mb_strtolower', $recipe['categories'] ) ) ); ?>"
-			data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
+				data-ingredients="<?php echo esc_attr( mb_strtolower( $recipe['ingredients'] ) ); ?>"
 			>
 				<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
 				<?php if ( ! empty( $recipe['categories'] ) ) : ?>
