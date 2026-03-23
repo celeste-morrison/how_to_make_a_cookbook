@@ -7,7 +7,7 @@
 global $wpdb;
 
 $rows = $wpdb->get_results(
-	"SELECT c.id, c.title, c.category
+	"SELECT c.id, c.title, c.object_id
 	FROM {$wpdb->prefix}mv_creations c
 	WHERE c.title NOT LIKE '% Creation'
 	ORDER BY c.title ASC"
@@ -23,37 +23,24 @@ foreach ( $rows as $row ) {
 		$row->id
 	) );
 
-	// Get category term name if set.
-	$cat_name = '';
-	if ( $row->category ) {
-		$term = get_term( (int) $row->category );
-		if ( $term && ! is_wp_error( $term ) ) {
-			$cat_name = $term->name;
-		}
-	}
-
-	// Fall back to wprm_course taxonomy on the matching wprm_recipe for category.
-	if ( ! $cat_name ) {
-		$wprm = $wpdb->get_row( $wpdb->prepare(
-			"SELECT ID FROM {$wpdb->posts} WHERE post_type = 'wprm_recipe' AND post_status = 'publish' AND post_title = %s LIMIT 1",
-			$row->title
-		) );
-		if ( $wprm ) {
-			$terms = get_the_terms( $wprm->ID, 'wprm_course' );
-			if ( $terms && ! is_wp_error( $terms ) ) {
-				$cat_name = $terms[0]->name;
+	// Get categories from WordPress category taxonomy assigned to the mv_create post.
+	$cat_names = [];
+	if ( $row->object_id ) {
+		$terms = wp_get_object_terms( (int) $row->object_id, 'category' );
+		if ( $terms && ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term ) {
+				$cat_names[] = $term->name;
+				if ( ! in_array( $term->name, $categories, true ) ) {
+					$categories[] = $term->name;
+				}
 			}
 		}
-	}
-
-	if ( $cat_name && ! in_array( $cat_name, $categories, true ) ) {
-		$categories[] = $cat_name;
 	}
 
 	$recipe_data[] = [
 		'id'          => $row->id,
 		'name'        => $row->title,
-		'category'    => $cat_name,
+		'categories'  => $cat_names,
 		'url'         => home_url( '/recipe/' . sanitize_title( $row->title ) . '/' ),
 		'ingredients' => array_filter( $supplies ),
 	];
@@ -77,12 +64,12 @@ sort( $categories );
 					href="<?php echo esc_url( $recipe['url'] ); ?>"
 					class="recipe-card"
 					data-name="<?php echo esc_attr( mb_strtolower( $recipe['name'] ) ); ?>"
-					data-categories="<?php echo esc_attr( mb_strtolower( $recipe['category'] ) ); ?>"
+					data-categories="<?php echo esc_attr( implode( ',', array_map( 'mb_strtolower', $recipe['categories'] ) ) ); ?>"
 					data-ingredients="<?php echo esc_attr( mb_strtolower( implode( ' ', $recipe['ingredients'] ) ) ); ?>"
 				>
 					<span class="recipe-card-name"><?php echo esc_html( $recipe['name'] ); ?></span>
-					<?php if ( $recipe['category'] ) : ?>
-						<span class="recipe-card-category"><?php echo esc_html( $recipe['category'] ); ?></span>
+					<?php if ( ! empty( $recipe['categories'] ) ) : ?>
+						<span class="recipe-card-category"><?php echo esc_html( implode( ', ', $recipe['categories'] ) ); ?></span>
 					<?php endif; ?>
 				</a>
 			<?php endforeach; ?>
